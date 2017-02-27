@@ -1,0 +1,49 @@
+<script>
+                (function ($) {
+                $(document).ready(function () {
+                    $('form.import-profile').live("submit",function (event) {
+                            event.preventDefault();
+                            $('.bp-user-notice-message').remove();
+                            $.post("/wp-admin/admin-ajax.php", $(this).serialize(), function (data) {
+
+                                if(data.result == false){
+                                    var html = '<div id="message" class="bp-user-notice-message error"><p>';
+                                    $.each(data.errors, function () {
+                                        html += this+'<br>';
+                                    });
+                                    html += '</p></div>';
+                                    $(html).insertAfter($('form.import-profile'));
+                                } else {
+                                    var html = '<div id="message" class="bp-user-notice-message success"><p>Your notice has been posted</p></div>';
+                                    $(html).insertAfter($('form.import-profile'));
+                                    $('form.import-profile').slideUp();
+                                }
+                            });
+                        }
+                    );
+                });
+            })(jQuery)
+        </script>
+
+        <div class="panel panel-warning">
+            <div class="panel-heading">Import Existing Profile</div>            
+            <div class="panel-body">
+                <h5>Warning, currently attachments, images, and all media are not transfered. </h5>
+                <form class="form import-profile">                            
+                <label for="user">Username</label>
+                <input name="u" class="form-control" type="text"  placeholder="Username / Email"> 
+                </input>
+                <label>Password</label>
+                <input name="p" class="form-control" type="password"  placeholder="Password"> 
+                <label>Site to import from</label>
+                <select name="s">
+                     <option value="this">This Site</option>    
+
+                <option value="coastal">Coastal WWOOF</option>    
+                </select>
+                <?php wp_nonce_field('import-profile'); ?>
+                <input type="hidden" name="action" value="gw_import_user"> 
+                <input type="submit" value="Import"></button>
+                </form>
+                </div>
+                </div>
