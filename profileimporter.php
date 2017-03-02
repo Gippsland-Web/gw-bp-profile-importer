@@ -4,7 +4,7 @@
  Plugin URI: 
  Description: Allows users to Import BP data from sister wwoof sites. Both must be running same plugin.
  Author: GippslandWeb
- Version: 1.1
+ Version: 1.2
  Author URI: http://gippslandweb.com.au
  GitHub Plugin URI: gippslandweb/gw-bp-profile-importer
  */
@@ -46,7 +46,6 @@
                  echo 'failure';
                  return;
              }
-             
              foreach($data->data as $d) {
                  //check its type against type
 		$t = $wpdb->get_row('SELECT type from wp_bp_xprofile_fields WHERE id = '.$d->field_id);
@@ -58,7 +57,7 @@
                      'wp_bp_xprofile_data',
                      array('value' => $d->value, 'last_updated' => current_time('mysql')),
                      array('field_id'=> $d->field_id, 'user_id' => get_current_user_id()),
-                     array('%s','%d'),
+                     array('%s','%s'),
                      array('%d','%d'));
 echo "||updated field".$d->field_id." ".$d->value;
                if($r === false) {
