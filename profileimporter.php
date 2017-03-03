@@ -2,9 +2,9 @@
 /*
  Plugin Name: GW BP Profile Import / Export
  Plugin URI: 
- Description: Allows users to Import BP data from sister wwoof sites. Both must be running same plugin.
+ Description: Allows users to Import BP data from sister wwoof sites. Both must be running same plugin. [gw-profile-importer]
  Author: GippslandWeb
- Version: 1.2
+ Version: 1.3
  Author URI: http://gippslandweb.com.au
  GitHub Plugin URI: gippslandweb/gw-bp-profile-importer
  */
@@ -31,7 +31,7 @@
          $user = $_POST['u'];
          $pass = $_POST['p'];
          $url = "http://www.lakes.com.au";
-         //$url = "http://localhost";
+         $url = "http://localhost";
          if($_POST['s'] == 'coastal')
             $url = "http://coastalwaters.info";
          global $wpdb;
@@ -46,6 +46,8 @@
                  echo 'failure';
                  return;
              }
+             var_dump($data->reviews);
+             die();
              foreach($data->data as $d) {
                  //check its type against type
 		$t = $wpdb->get_row('SELECT type from wp_bp_xprofile_fields WHERE id = '.$d->field_id);
@@ -53,20 +55,28 @@
                      echo "|| type mismatch skipping field: ".$d->field_id;
                      continue;
                  }
-                 $r = $wpdb->update(
+                 $x = $wpdb->get_row('SELECT * from wp_bp_xprofile_data where user_id ='.get_current_user_id(). 'AND field_id = '.$d->field_id);
+                 if($x == null){
+ $r = $wpdb->update(
                      'wp_bp_xprofile_data',
                      array('value' => $d->value, 'last_updated' => current_time('mysql')),
                      array('field_id'=> $d->field_id, 'user_id' => get_current_user_id()),
                      array('%s','%s'),
                      array('%d','%d'));
 echo "||updated field".$d->field_id." ".$d->value;
-               if($r === false) {
-                   //error updating insert it
-                $wpdb->insert('wp_bp_xprofile_data', array('field_id'=> $d->field_id, 'user_id' => get_current_user_id(), 'value' => $d->value, 'last_updated' => current_time('mysql')));
-echo "||Inserted field".$d->field_id." ".$d->value;              
- }
-
+                 }
+                 else {
+$wpdb->insert('wp_bp_xprofile_data', array('field_id'=> $d->field_id, 'user_id' => get_current_user_id(), 'value' => $d->value, 'last_updated' => current_time('mysql')));
+echo "||Inserted field".$d->field_id." ".$d->value;       
+                 }
              }
+//store the reviews.
+if(isset($data->reviews)) {
+    foreach($data->reviews as $rev) {
+        add_user_meta(get_current_user_id(),'imported-review',$rev);
+    }
+}
+
          }
      }
 
@@ -85,12 +95,24 @@ echo "||Inserted field".$d->field_id." ".$d->value;
          if($user) {
              $results['result'] = true;
              $sql = "SELECT `field_id`, `user_id`, `value`, `last_updated`, `type` FROM wp_bp_xprofile_data INNER JOIN wp_bp_xprofile_fields 
-ON (wp_bp_xprofile_data.field_id = wp_bp_xprofile_fields.id) WHERE user_id = '$user->ID'";
+ON (wp_bp_xprofile_data.field_id = wp_bp_xprofile_fields.id) WHERE user_id = ''";
 
 //             $sql = "SELECT * FROM wp_bp_xprofile_data WHERE user_id = '$user->ID'";
              $res = $wpdb->get_results($sql);
              
              $results['data'] = $res;
+
+$reviewsQuery = array(
+      'post_type' =>'bp-user-reviews',
+      'post_status' =>'publish',
+      'posts_per_page' => -1,
+      'meta_query' => array(array('key' => 'user_id','value'=> $user->ID)));
+
+             $results['reviews'] = get_posts($reviewsQuery);
+             foreach($results['reviews'] as $rev) {
+                $rev->author_name = bp_core_get_username($rev->post_author);
+                $rev->backlink = get_site_url().'/members/'.$rev->author_name;
+             }
          }
          else {
             
