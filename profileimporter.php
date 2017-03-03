@@ -4,7 +4,7 @@
  Plugin URI: 
  Description: Allows users to Import BP data from sister wwoof sites. Both must be running same plugin. [gw-profile-importer]
  Author: GippslandWeb
- Version: 1.3
+ Version: 1.4
  Author URI: http://gippslandweb.com.au
  GitHub Plugin URI: gippslandweb/gw-bp-profile-importer
  */
@@ -46,8 +46,6 @@
                  echo 'failure';
                  return;
              }
-             var_dump($data->reviews);
-             die();
              foreach($data->data as $d) {
                  //check its type against type
 		$t = $wpdb->get_row('SELECT type from wp_bp_xprofile_fields WHERE id = '.$d->field_id);
@@ -76,7 +74,6 @@ if(isset($data->reviews)) {
         add_user_meta(get_current_user_id(),'imported-review',$rev);
     }
 }
-
          }
      }
 
@@ -108,10 +105,15 @@ $reviewsQuery = array(
       'posts_per_page' => -1,
       'meta_query' => array(array('key' => 'user_id','value'=> $user->ID)));
 
-             $results['reviews'] = get_posts($reviewsQuery);
-             foreach($results['reviews'] as $rev) {
-                $rev->author_name = bp_core_get_username($rev->post_author);
-                $rev->backlink = get_site_url().'/members/'.$rev->author_name;
+             $results['reviews'] = array();
+             foreach(get_posts($reviewsQuery) as $r) {
+                 $rev = new \stdClass();
+
+                $rev->author_name = bp_core_get_username($r->post_author);
+                $rev->backlink = get_site_url().'/members/'.$r->author_name;
+                $rev->review = $r->review;
+                $rev->stars = $r->stars;
+                array_push($results['reviews'],$rev);
              }
          }
          else {
