@@ -4,9 +4,9 @@
  Plugin URI: 
  Description: Allows users to Import BP data from sister wwoof sites. Both must be running same plugin. [gw-profile-importer]
  Author: GippslandWeb
- Version: 1.4
+ Version: 1.5
  Author URI: http://gippslandweb.com.au
- GitHub Plugin URI: gippslandweb/gw-bp-profile-importer
+ GitHub Plugin URI: Gippsland-Web/gw-bp-profile-importer
  */
 
  class GW_ProfileImporter {
