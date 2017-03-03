@@ -31,13 +31,13 @@
          $user = $_POST['u'];
          $pass = $_POST['p'];
          $url = "http://www.lakes.com.au";
-         $url = "http://localhost";
+         //$url = "http://localhost";
          if($_POST['s'] == 'coastal')
             $url = "http://coastalwaters.info";
          global $wpdb;
          $response = wp_remote_post($url."/wp-json/gwnb/v1/export", array('method' => 'POST', 'body' => array('u' => $user, 'p' => $pass, 's' => $this->sharedKey)));
          if(is_wp_error($response)) {
-             echo "Something went wrong";
+             echo "Something went wrong".var_dump($response);
          }
          else {
              $data = json_decode($response['body']);
@@ -74,6 +74,30 @@ if(isset($data->reviews)) {
         add_user_meta(get_current_user_id(),'imported-review',$rev);
     }
 }
+//Import avatar and header photo
+$image = $data->avatar;
+$get = wp_remote_get($image);
+
+$mirror = wp_upload_bits('x'.basename($image),'',wp_remote_retrieve_body($get));
+
+$avatar_to_crop = $mirror['url'];
+$avatar_to_crop = str_replace(get_site_url().'/wp-content/uploads','',$avatar_to_crop);
+
+		// Crop to default values.
+		$crop_args = array( 'item_id' => get_current_user_id(), 'original_file' => $avatar_to_crop, 'crop_x' => 0, 'crop_y' => 0,'avatar_dir' => 'avatars','object' => 'user' );
+
+    $avatar_folder_dir = bp_core_avatar_upload_path() . '/avatars/'.get_current_user_id().'/';
+    var_dump($avatar_folder_dir);
+		if ( ! file_exists( $avatar_folder_dir ) ) {
+			wp_mkdir_p($avatar_folder_dir);
+		}
+$avatar_attachment = new BP_Attachment_Avatar();
+	$cropped           = $avatar_attachment->crop( $crop_args );
+    var_dump($cropped);
+		//echo 'Avatar : '.bp_core_avatar_handle_crop( $crop_args );
+        unlink(basename($image));
+do_action( 'xprofile_avatar_uploaded', get_current_user_id(), "Upload" );
+
          }
      }
 
@@ -98,14 +122,15 @@ ON (wp_bp_xprofile_data.field_id = wp_bp_xprofile_fields.id) WHERE user_id = ''"
              $res = $wpdb->get_results($sql);
              
              $results['data'] = $res;
-
+             $results['reviews'] = array();
+             $results['avatar'] = bp_core_fetch_avatar(array('item_id' => $user->ID, 'type' => 'full', 'html' => false ));
 $reviewsQuery = array(
       'post_type' =>'bp-user-reviews',
       'post_status' =>'publish',
       'posts_per_page' => -1,
       'meta_query' => array(array('key' => 'user_id','value'=> $user->ID)));
 
-             $results['reviews'] = array();
+
              foreach(get_posts($reviewsQuery) as $r) {
                  $rev = new \stdClass();
 
