@@ -4,7 +4,7 @@
  Plugin URI: 
  Description: Allows users to Import BP data from sister wwoof sites. Both must be running same plugin. [gw-profile-importer]
  Author: GippslandWeb
- Version: 1.5
+ Version: 1.5.1
  Author URI: http://gippslandweb.com.au
  GitHub Plugin URI: Gippsland-Web/gw-bp-profile-importer
  */
@@ -28,6 +28,8 @@
      }
 
      function AjaxImport() {
+         $result = new \stdClass();
+         $result->result = true;
          $user = $_POST['u'];
          $pass = $_POST['p'];
          $url = "http://www.lakes.com.au";
@@ -37,14 +39,17 @@
          global $wpdb;
          $response = wp_remote_post($url."/wp-json/gwnb/v1/export", array('method' => 'POST', 'body' => array('u' => $user, 'p' => $pass, 's' => $this->sharedKey)));
          if(is_wp_error($response)) {
-             echo "Something went wrong".var_dump($response);
+             $result->result = false;
+             array_push($result->errors,"Error connecting to remote site");
+             return json_encode($result);
          }
          else {
              $data = json_decode($response['body']);
              if($data->result == false)
              {
-                 echo 'failure';
-                 return;
+                $result->result = false;
+                array_push($result->errors,"Error parsing data from remote site.");
+                return json_encode($result);
              }
              foreach($data->data as $d) {
                  //check its type against type
@@ -74,6 +79,30 @@ if(isset($data->reviews)) {
         add_user_meta(get_current_user_id(),'imported-review',$rev);
     }
 }
+
+//cover
+//bp_attachments_delete_file( array( 'item_id' => get_current_user_id(), 'object_dir' => "members", 'type' => 'cover-image' ) );
+
+
+$get = wp_remote_get($data->cover);
+
+$localCopy = wp_upload_bits('x'.basename($data->cover),'',wp_remote_retrieve_body($get));
+
+//$avatar_to_crop = str_replace(get_site_url().'/wp-content/uploads','',$avatar_to_crop);
+
+$cover_image_attachment = new BP_Attachment_Cover_Image();
+$cover_subdir = 'members' . '/' . get_current_user_id() . '/cover-image';
+	$cover_dir    = trailingslashit( $bp_attachments_uploads_dir['basedir'] ) . $cover_subdir;
+    $cover = bp_attachments_cover_image_generate_file( array(
+		'file'            => $localCopy['file'],
+		'component'       => 'xprofile',
+		'cover_image_dir' => $cover_dir
+	), $cover_image_attachment );
+
+
+
+
+
 //Import avatar and header photo
 $image = $data->avatar;
 $get = wp_remote_get($image);
@@ -87,13 +116,13 @@ $avatar_to_crop = str_replace(get_site_url().'/wp-content/uploads','',$avatar_to
 		$crop_args = array( 'item_id' => get_current_user_id(), 'original_file' => $avatar_to_crop, 'crop_x' => 0, 'crop_y' => 0,'avatar_dir' => 'avatars','object' => 'user' );
 
     $avatar_folder_dir = bp_core_avatar_upload_path() . '/avatars/'.get_current_user_id().'/';
-    var_dump($avatar_folder_dir);
+    //var_dump($avatar_folder_dir);
 		if ( ! file_exists( $avatar_folder_dir ) ) {
 			wp_mkdir_p($avatar_folder_dir);
 		}
 $avatar_attachment = new BP_Attachment_Avatar();
 	$cropped           = $avatar_attachment->crop( $crop_args );
-    var_dump($cropped);
+    //var_dump($cropped);
 		//echo 'Avatar : '.bp_core_avatar_handle_crop( $crop_args );
         unlink(basename($image));
 do_action( 'xprofile_avatar_uploaded', get_current_user_id(), "Upload" );
@@ -130,6 +159,8 @@ $reviewsQuery = array(
       'posts_per_page' => -1,
       'meta_query' => array(array('key' => 'user_id','value'=> $user->ID)));
 
+      $results['cover'] = bp_attachments_get_attachment('url',array("object_dir" => "members", 'item_id' => $user->ID, 'type' => 'cover-imag'));
+
 
              foreach(get_posts($reviewsQuery) as $r) {
                  $rev = new \stdClass();
@@ -144,8 +175,6 @@ $reviewsQuery = array(
          else {
             
          }
-         //check credentials
-         //dump user to JSON 
          return $results;
          
      }
