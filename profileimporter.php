@@ -4,7 +4,7 @@
  Plugin URI: 
  Description: Allows users to Import BP data from sister wwoof sites. Both must be running same plugin. [gw-profile-importer]
  Author: GippslandWeb
- Version: 1.5.4
+ Version: 1.5.5
  Author URI: http://gippslandweb.com.au
  GitHub Plugin URI: Gippsland-Web/gw-bp-profile-importer
  */
@@ -51,6 +51,7 @@
         array_push($result->errors,"Error parsing data from remote site.");
         return json_encode($result);
         }
+        //var_dump($data);
         foreach($data->data as $d) {
             //check its type against type
             $t = $wpdb->get_row('SELECT type from wp_bp_xprofile_fields WHERE id = '.$d->field_id);
@@ -59,7 +60,8 @@
                 continue;
             }
             $x = $wpdb->get_row('SELECT * from wp_bp_xprofile_data where user_id ='.get_current_user_id(). 'AND field_id = '.$d->field_id);
-            if($x == null){
+            //var_dump($x);
+            if($x != null){
                 $r = $wpdb->update(
                 'wp_bp_xprofile_data',
                 array('value' => $d->value, 'last_updated' => current_time('mysql')),
@@ -134,7 +136,7 @@ $wpdb->insert('wp_bp_xprofile_data', array('field_id'=> $d->field_id, 'user_id' 
          if($user) {
              $results['result'] = true;
              $sql = "SELECT `field_id`, `user_id`, `value`, `last_updated`, `type` FROM wp_bp_xprofile_data INNER JOIN wp_bp_xprofile_fields 
-ON (wp_bp_xprofile_data.field_id = wp_bp_xprofile_fields.id) WHERE user_id = ''";
+ON (wp_bp_xprofile_data.field_id = wp_bp_xprofile_fields.id) WHERE user_id = ".$user->ID;
 
 //             $sql = "SELECT * FROM wp_bp_xprofile_data WHERE user_id = '$user->ID'";
              $res = $wpdb->get_results($sql);
