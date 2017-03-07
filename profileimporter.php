@@ -4,7 +4,7 @@
  Plugin URI: 
  Description: Allows users to Import BP data from sister wwoof sites. Both must be running same plugin. [gw-profile-importer]
  Author: GippslandWeb
- Version: 1.5.1
+ Version: 1.5.2
  Author URI: http://gippslandweb.com.au
  GitHub Plugin URI: Gippsland-Web/gw-bp-profile-importer
  */
@@ -27,7 +27,8 @@
      
      }
 
-     function AjaxImport() {
+     function AjaxImport() 
+     {
          $result = new \stdClass();
          $result->result = true;
          $user = $_POST['u'];
@@ -43,92 +44,77 @@
              array_push($result->errors,"Error connecting to remote site");
              return json_encode($result);
          }
-         else {
-             $data = json_decode($response['body']);
-             if($data->result == false)
-             {
-                $result->result = false;
-                array_push($result->errors,"Error parsing data from remote site.");
-                return json_encode($result);
-             }
-             foreach($data->data as $d) {
-                 //check its type against type
-		$t = $wpdb->get_row('SELECT type from wp_bp_xprofile_fields WHERE id = '.$d->field_id);
-                 if($t &&  $t->type != $d->type){
-                     echo "|| type mismatch skipping field: ".$d->field_id;
-                     continue;
-                 }
-                 $x = $wpdb->get_row('SELECT * from wp_bp_xprofile_data where user_id ='.get_current_user_id(). 'AND field_id = '.$d->field_id);
-                 if($x == null){
- $r = $wpdb->update(
-                     'wp_bp_xprofile_data',
-                     array('value' => $d->value, 'last_updated' => current_time('mysql')),
-                     array('field_id'=> $d->field_id, 'user_id' => get_current_user_id()),
-                     array('%s','%s'),
-                     array('%d','%d'));
-echo "||updated field".$d->field_id." ".$d->value;
-                 }
-                 else {
+        $data = json_decode($response['body']);
+        if($data->result == false)
+        {
+        $result->result = false;
+        array_push($result->errors,"Error parsing data from remote site.");
+        return json_encode($result);
+        }
+        foreach($data->data as $d) {
+            //check its type against type
+            $t = $wpdb->get_row('SELECT type from wp_bp_xprofile_fields WHERE id = '.$d->field_id);
+            if($t &&  $t->type != $d->type){
+                echo "|| type mismatch skipping field: ".$d->field_id;
+                continue;
+            }
+            $x = $wpdb->get_row('SELECT * from wp_bp_xprofile_data where user_id ='.get_current_user_id(). 'AND field_id = '.$d->field_id);
+            if($x == null){
+                $r = $wpdb->update(
+                'wp_bp_xprofile_data',
+                array('value' => $d->value, 'last_updated' => current_time('mysql')),
+                array('field_id'=> $d->field_id, 'user_id' => get_current_user_id()),
+                array('%s','%s'),
+                array('%d','%d'));
+            }
+            else {
 $wpdb->insert('wp_bp_xprofile_data', array('field_id'=> $d->field_id, 'user_id' => get_current_user_id(), 'value' => $d->value, 'last_updated' => current_time('mysql')));
-echo "||Inserted field".$d->field_id." ".$d->value;       
-                 }
-             }
+            }
+        }
+
 //store the reviews.
-if(isset($data->reviews)) {
-    foreach($data->reviews as $rev) {
-        add_user_meta(get_current_user_id(),'imported-review',$rev);
+    if(isset($data->reviews)) {
+        foreach($data->reviews as $rev) {
+            add_user_meta(get_current_user_id(),'imported-review',$rev);
+        }
     }
-}
 
-//cover
-//bp_attachments_delete_file( array( 'item_id' => get_current_user_id(), 'object_dir' => "members", 'type' => 'cover-image' ) );
+    //Delete existing cover image
+    bp_attachments_delete_file( array( 'item_id' => get_current_user_id(), 'object_dir' => "members", 'type' => 'cover-image' ) );
 
 
-$get = wp_remote_get($data->cover);
-
-$localCopy = wp_upload_bits('x'.basename($data->cover),'',wp_remote_retrieve_body($get));
-
-//$avatar_to_crop = str_replace(get_site_url().'/wp-content/uploads','',$avatar_to_crop);
-
-$cover_image_attachment = new BP_Attachment_Cover_Image();
-$cover_subdir = 'members' . '/' . get_current_user_id() . '/cover-image';
-	$cover_dir    = trailingslashit( $bp_attachments_uploads_dir['basedir'] ) . $cover_subdir;
-    $cover = bp_attachments_cover_image_generate_file( array(
-		'file'            => $localCopy['file'],
-		'component'       => 'xprofile',
-		'cover_image_dir' => $cover_dir
-	), $cover_image_attachment );
+    //Download and store new cover image
+    $get = wp_remote_get($data->cover);
+    $localCopy = wp_upload_bits('x'.basename($data->cover),'',wp_remote_retrieve_body($get));
+    $cover_subdir = 'members' . '/' . get_current_user_id() . '/cover-image';
+    $cover_dir    = trailingslashit( bp_attachments_uploads_dir_get()['basedir'] ) . $cover_subdir;
+    rename($localCopy['file'],trailingslashit($cover_dir).basename($data->cover));
 
 
 
+    //Import avatar and header photo
+    $image = $data->avatar;
+    $get = wp_remote_get($data->avatar);
 
+    $mirror = wp_upload_bits('x'.basename($data->avatar),'',wp_remote_retrieve_body($get));
 
-//Import avatar and header photo
-$image = $data->avatar;
-$get = wp_remote_get($image);
+    $avatar_to_crop = $mirror['url'];
+    $avatar_to_crop = str_replace(get_site_url().'/wp-content/uploads','',$avatar_to_crop);
 
-$mirror = wp_upload_bits('x'.basename($image),'',wp_remote_retrieve_body($get));
-
-$avatar_to_crop = $mirror['url'];
-$avatar_to_crop = str_replace(get_site_url().'/wp-content/uploads','',$avatar_to_crop);
-
-		// Crop to default values.
-		$crop_args = array( 'item_id' => get_current_user_id(), 'original_file' => $avatar_to_crop, 'crop_x' => 0, 'crop_y' => 0,'avatar_dir' => 'avatars','object' => 'user' );
+    // Crop to default values.
+    $crop_args = array( 'item_id' => get_current_user_id(), 'original_file' => $avatar_to_crop, 'crop_x' => 0, 'crop_y' => 0,'avatar_dir' => 'avatars','object' => 'user' );
 
     $avatar_folder_dir = bp_core_avatar_upload_path() . '/avatars/'.get_current_user_id().'/';
-    //var_dump($avatar_folder_dir);
-		if ( ! file_exists( $avatar_folder_dir ) ) {
-			wp_mkdir_p($avatar_folder_dir);
-		}
-$avatar_attachment = new BP_Attachment_Avatar();
-	$cropped           = $avatar_attachment->crop( $crop_args );
-    //var_dump($cropped);
-		//echo 'Avatar : '.bp_core_avatar_handle_crop( $crop_args );
-        unlink(basename($image));
-do_action( 'xprofile_avatar_uploaded', get_current_user_id(), "Upload" );
+    if ( ! file_exists( $avatar_folder_dir ) ) {
+        wp_mkdir_p($avatar_folder_dir);
+    }
+    $avatar_attachment = new BP_Attachment_Avatar();
+    $cropped           = $avatar_attachment->crop( $crop_args );
+    unlink(basename($mirror['file']));
+    do_action( 'xprofile_avatar_uploaded', get_current_user_id(), "Upload" );
 
-         }
-     }
+    
+}
 
 
      function ExportUser() {
@@ -159,7 +145,7 @@ $reviewsQuery = array(
       'posts_per_page' => -1,
       'meta_query' => array(array('key' => 'user_id','value'=> $user->ID)));
 
-      $results['cover'] = bp_attachments_get_attachment('url',array("object_dir" => "members", 'item_id' => $user->ID, 'type' => 'cover-imag'));
+      $results['cover'] = bp_attachments_get_attachment('url',array("object_dir" => "members", 'item_id' => $user->ID, 'type' => 'cover-image'));
 
 
              foreach(get_posts($reviewsQuery) as $r) {
