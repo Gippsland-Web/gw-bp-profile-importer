@@ -4,7 +4,7 @@
  Plugin URI: 
  Description: Allows users to Import BP data from sister wwoof sites. Both must be running same plugin. [gw-profile-importer]
  Author: GippslandWeb
- Version: 1.5.3
+ Version: 1.5.4
  Author URI: http://gippslandweb.com.au
  GitHub Plugin URI: Gippsland-Web/gw-bp-profile-importer
  */
@@ -88,6 +88,9 @@ $wpdb->insert('wp_bp_xprofile_data', array('field_id'=> $d->field_id, 'user_id' 
     $localCopy = wp_upload_bits('x'.basename($data->cover),'',wp_remote_retrieve_body($get));
     $cover_subdir = 'members' . '/' . get_current_user_id() . '/cover-image';
     $cover_dir    = trailingslashit( bp_attachments_uploads_dir_get()['basedir'] ) . $cover_subdir;
+    if ( ! file_exists( trailingslashit($cover_dir) ) ) {
+        wp_mkdir_p(trailingslashit($cover_dir));
+    }
     rename($localCopy['file'],trailingslashit($cover_dir).basename($data->cover));
 
 
